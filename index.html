@@ -6,22 +6,35 @@
 </head>
 <body>
 
-<div id="counter"></div>
+<div id="counter">
+    <span class="h"></span> :
+    <span class="m"></span> :
+    <span class="s"></span>
+    <span class="ms"></span>
+</div>
+
+<div class="control">
+    <button data-action="start">Start</button>
+    <button data-action="pause">Pause</button>
+    <button data-action="stop">Stop</button>
+</div>
+
+<script type="text/javascript" src="vendor/jquery-1.9.1.js"></script>
 
 <script type="text/javascript">
     (function() {
 
         var defaults = {
-            lengthInSeconds : 15*60
+            lengthInSeconds : 15 * 60 * 60 + 30 * 60 + 10
         };
 
-        var CountDown = function(container, _options) {
+        var CountDown = function(_options) {
             var options = $.extend({}, defaults, _options);
 
-            this.$el = container;
-
             this.startTime = 0;
-            this.lengthInSeconds = options.lengthInSeconds;
+
+            this.setTimeLength(options.lengthInSeconds);
+
             this.isPaused = false;
 
             this.timeLeft = {
@@ -29,7 +42,7 @@
                 minutes: "00",
                 seconds: "00",
                 milliseconds: "000"
-            }
+            };
         };
 
         CountDown.prototype = {
@@ -55,18 +68,29 @@
                 return this;
             },
 
+            setTimeLength: function(seconds) {
+                console.log(seconds);
+                this.lengthInSeconds = seconds;
+                this.lengthInMs = seconds * 1000;
+            },
+
             _tic: function() {
-                var that = this;
+                var that = this,
+                    now,
+                    timeLeftInMs;
 
                 if(!this.isPaused) {
-                    this.timeLeft.hours = "";
-                    this.timeLeft.minutes = "";
-                    this.timeLeft.seconds = "";
-                    this.timeLeft.milliseconds = "";
+                    now = Date.now();
+                    timeLeftInMs = this.lengthInMs - (now - this.startTime);
+
+                    this.timeLeft.hours        = Math.floor(timeLeftInMs / (1000 * 60 * 60));
+                    this.timeLeft.minutes      = Math.floor((timeLeftInMs / (1000 * 60)) - (this.timeLeft.hours * 60));
+                    this.timeLeft.seconds      = Math.floor((timeLeftInMs / 1000) - (this.timeLeft.hours * 60 * 60) - (this.timeLeft.minutes * 60));
+                    this.timeLeft.milliseconds = Math.floor(timeLeftInMs - (this.timeLeft.hours * 60 * 60 * 1000) - (this.timeLeft.minutes * 60 * 1000) - (this.timeLeft.seconds * 1000));
                 }
 
-                requestAnimationFrame(function() {that._tic();});
                 that._render();
+                requestAnimationFrame(function() {that._tic();});
             },
 
             _render: function() {
@@ -82,12 +106,22 @@
             },
 
             _renderTime: function() {
-
+                $('.h').html(Math.round(this.timeLeft.hours));
+                $('.m').html(Math.round(this.timeLeft.minutes));
+                $('.s').html(Math.round(this.timeLeft.seconds));
+                $('.ms').html(Math.round(this.timeLeft.milliseconds));
             }
         };
 
 
-        var myCountDown = new CountDown()
+        var myCountDown = new CountDown();
+//        myCountDown.start();
+
+        $('.control button').click(function() {
+            var action = $(this).data('action');
+
+            myCountDown[action]();
+        })
     })();
 </script>
 
