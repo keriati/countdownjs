@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en-US">
+<head>
+    <meta charset="UTF-8">
+    <title></title>
+</head>
+<body>
+
+<div id="counter"></div>
+
+<script type="text/javascript">
+    (function() {
+
+        var defaults = {
+            lengthInSeconds : 15*60
+        };
+
+        var CountDown = function(container, _options) {
+            var options = $.extend({}, defaults, _options);
+
+            this.$el = container;
+
+            this.startTime = 0;
+            this.lengthInSeconds = options.lengthInSeconds;
+            this.isPaused = false;
+
+            this.timeLeft = {
+                hours: "00",
+                minutes: "00",
+                seconds: "00",
+                milliseconds: "000"
+            }
+        };
+
+        CountDown.prototype = {
+            start: function() {
+                var that = this;
+
+                this.startTime = Date.now();
+                requestAnimationFrame(function() {that._tic();});
+
+                return this;
+            },
+
+            pause: function() {
+                this.isPaused = ! this.isPaused;
+                return this;
+            },
+
+            stop: function() {
+                return this;
+            },
+
+            reset: function() {
+                return this;
+            },
+
+            _tic: function() {
+                var that = this;
+
+                if(!this.isPaused) {
+                    this.timeLeft.hours = "";
+                    this.timeLeft.minutes = "";
+                    this.timeLeft.seconds = "";
+                    this.timeLeft.milliseconds = "";
+                }
+
+                requestAnimationFrame(function() {that._tic();});
+                that._render();
+            },
+
+            _render: function() {
+                if(this.isPaused) {
+                    this._renderPaused();
+                } else {
+                    this._renderTime();
+                }
+            },
+
+            _renderPaused: function() {
+
+            },
+
+            _renderTime: function() {
+
+            }
+        };
+
+
+        var myCountDown = new CountDown()
+    })();
+</script>
+
+</body>
+</html>
