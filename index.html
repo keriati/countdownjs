@@ -3,13 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <title></title>
+    <style type="text/css">
+        #canvas {
+            width: 500px;
+            height: 500px;
+            border: 1px solid black;
+        }
+    </style>
 </head>
 <body>
 
 <div id="counter">
     <span class="h"></span> :
     <span class="m"></span> :
-    <span class="s"></span>
+    <span class="s"></span> :
     <span class="ms"></span>
 </div>
 
@@ -18,6 +25,8 @@
     <button data-action="pause">Pause</button>
     <button data-action="stop">Stop</button>
 </div>
+
+<canvas id="canvas" width="500px" height="500px"></canvas>
 
 <script type="text/javascript" src="vendor/jquery-1.9.1.js"></script>
 
@@ -36,6 +45,8 @@
             this.setTimeLength(options.lengthInSeconds);
 
             this.isPaused = false;
+
+            this.ctx = document.getElementById('canvas').getContext('2d');
 
             this.timeLeft = {
                 hours: "00",
@@ -106,15 +117,34 @@
             },
 
             _renderTime: function() {
-                $('.h').html(Math.round(this.timeLeft.hours));
-                $('.m').html(Math.round(this.timeLeft.minutes));
-                $('.s').html(Math.round(this.timeLeft.seconds));
-                $('.ms').html(Math.round(this.timeLeft.milliseconds));
+//                $('.h').html(Math.round(this.timeLeft.hours));
+//                $('.m').html(Math.round(this.timeLeft.minutes));
+//                $('.s').html(Math.round(this.timeLeft.seconds));
+//                $('.ms').html(Math.round(this.timeLeft.milliseconds));
+                this._renderCTX();
+
+            },
+
+            _renderCTX: function() {
+                this.ctx.beginPath();
+
+                var x              = 60,               // x coordinate
+                    y              = 60,               // y coordinate
+                    radius         = 50,                    // Arc radius
+                    startAngle     = -90,                     // Starting point on circle
+                    endAngle       = -180,                // End point on circle
+                    anticlockwise  = true;                   // clockwise or anticlockwise
+
+                this.ctx.strokeStyle = "#df4b26";
+                this.ctx.lineWidth = 4;
+
+                this.ctx.arc(x, y, radius, (Math.PI/180) * startAngle, (Math.PI/180) * endAngle, anticlockwise);
+                this.ctx.stroke();
             }
         };
 
 
-        var myCountDown = new CountDown();
+        window.myCountDown = new CountDown();
 //        myCountDown.start();
 
         $('.control button').click(function() {
