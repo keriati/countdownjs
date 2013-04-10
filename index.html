@@ -22,19 +22,43 @@
 
 <div class="control">
     <button data-action="start">Start</button>
-    <button data-action="pause">Pause</button>
     <button data-action="stop">Stop</button>
 </div>
 
 <canvas id="canvas" width="500px" height="500px"></canvas>
 
 <script type="text/javascript" src="vendor/jquery-1.9.1.js"></script>
+<script type="text/javascript">
+    (function() {
+        var lastTime = 0;
+        var vendors = ['ms', 'moz', 'webkit', 'o'];
+        for(var x = 0; x < vendors.length && !window.requestAnimationFrame; ++x) {
+            window.requestAnimationFrame = window[vendors[x]+'RequestAnimationFrame'];
+            window.cancelAnimationFrame = window[vendors[x]+'CancelAnimationFrame']
+                                       || window[vendors[x]+'CancelRequestAnimationFrame'];
+        }
 
+        if (!window.requestAnimationFrame)
+            window.requestAnimationFrame = function(callback, element) {
+                var currTime = new Date().getTime();
+                var timeToCall = Math.max(0, 16 - (currTime - lastTime));
+                var id = window.setTimeout(function() { callback(currTime + timeToCall); },
+                  timeToCall);
+                lastTime = currTime + timeToCall;
+                return id;
+            };
+
+        if (!window.cancelAnimationFrame)
+            window.cancelAnimationFrame = function(id) {
+                clearTimeout(id);
+            };
+    }());
+</script>
 <script type="text/javascript">
     (function() {
 
         var defaults = {
-            lengthInSeconds : 15 * 60 * 60 + 30 * 60 + 10
+            lengthInSeconds : 0 * 60 * 60 + 1 * 60 + 0
         };
 
         var CountDown = function(_options) {
@@ -42,36 +66,35 @@
 
             this.startTime = 0;
 
-            this.setTimeLength(options.lengthInSeconds);
+            this.stopped = true;
 
-            this.isPaused = false;
-
-            this.ctx = document.getElementById('canvas').getContext('2d');
+            this.canvas = document.getElementById('canvas');
+            this.ctx = this.canvas.getContext('2d');
 
             this.timeLeft = {
-                hours: "00",
-                minutes: "00",
-                seconds: "00",
-                milliseconds: "000"
+                hours: 0,
+                minutes: 0,
+                seconds: 0,
+                milliseconds: 0,
+                percent: 0
             };
+            this.setTimeLength(options.lengthInSeconds);
         };
 
         CountDown.prototype = {
             start: function() {
                 var that = this;
 
+                this.stopped = false;
                 this.startTime = Date.now();
+
                 requestAnimationFrame(function() {that._tic();});
 
                 return this;
             },
 
-            pause: function() {
-                this.isPaused = ! this.isPaused;
-                return this;
-            },
-
             stop: function() {
+                this.stopped = true;
                 return this;
             },
 
@@ -80,9 +103,10 @@
             },
 
             setTimeLength: function(seconds) {
-                console.log(seconds);
                 this.lengthInSeconds = seconds;
                 this.lengthInMs = seconds * 1000;
+                this._generateTimeLeft(this.lengthInMs);
+                this._render();
             },
 
             _tic: function() {
@@ -90,56 +114,172 @@
                     now,
                     timeLeftInMs;
 
-                if(!this.isPaused) {
-                    now = Date.now();
-                    timeLeftInMs = this.lengthInMs - (now - this.startTime);
+                now = Date.now();
+                timeLeftInMs = this.lengthInMs - (now - this.startTime);
 
-                    this.timeLeft.hours        = Math.floor(timeLeftInMs / (1000 * 60 * 60));
-                    this.timeLeft.minutes      = Math.floor((timeLeftInMs / (1000 * 60)) - (this.timeLeft.hours * 60));
-                    this.timeLeft.seconds      = Math.floor((timeLeftInMs / 1000) - (this.timeLeft.hours * 60 * 60) - (this.timeLeft.minutes * 60));
-                    this.timeLeft.milliseconds = Math.floor(timeLeftInMs - (this.timeLeft.hours * 60 * 60 * 1000) - (this.timeLeft.minutes * 60 * 1000) - (this.timeLeft.seconds * 1000));
+                if(timeLeftInMs <= 0) {
+                    this.timeLeft.hours = 0;
+                    this.timeLeft.minutes = 0;
+                    this.timeLeft.seconds = 0;
+                    this.timeLeft.milliseconds = 0;
+                    this.timeLeft.percent = 0;
+
+                    this.stopped = true;
+                } else {
+                    this._generateTimeLeft(timeLeftInMs);
                 }
 
                 that._render();
-                requestAnimationFrame(function() {that._tic();});
-            },
-
-            _render: function() {
-                if(this.isPaused) {
-                    this._renderPaused();
-                } else {
-                    this._renderTime();
+                if( ! this.stopped) {
+                    requestAnimationFrame(function() {that._tic();});
                 }
             },
 
-            _renderPaused: function() {
-
+            _generateTimeLeft: function(timeLeftInMs) {
+                this.timeLeft.hours        = Math.floor(timeLeftInMs / (1000 * 60 * 60));
+                this.timeLeft.minutes      = Math.floor((timeLeftInMs / (1000 * 60)) - (this.timeLeft.hours * 60));
+                this.timeLeft.seconds      = Math.floor((timeLeftInMs / 1000) - (this.timeLeft.hours * 60 * 60) - (this.timeLeft.minutes * 60));
+                this.timeLeft.milliseconds = Math.floor(timeLeftInMs - (this.timeLeft.hours * 60 * 60 * 1000) - (this.timeLeft.minutes * 60 * 1000) - (this.timeLeft.seconds * 1000));
+                this.timeLeft.percent      = timeLeftInMs * 100 / this.lengthInMs;
             },
 
-            _renderTime: function() {
+            _render: function() {
 //                $('.h').html(Math.round(this.timeLeft.hours));
 //                $('.m').html(Math.round(this.timeLeft.minutes));
 //                $('.s').html(Math.round(this.timeLeft.seconds));
 //                $('.ms').html(Math.round(this.timeLeft.milliseconds));
                 this._renderCTX();
-
             },
 
             _renderCTX: function() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+                this._renderRingBg();
+                this._renderProgressArc();
+                this._renderRingOuter();
+                this._renderRingInner();
+                this._renderText()
+            },
+
+            _renderProgressArc: function() {
+                var gradient = this.ctx.createLinearGradient(
+                        (this.canvas.width / 2),
+                        (this.canvas.height / 2) - 45,
+                        (this.canvas.width / 2),
+                        (this.canvas.height / 2) + 45
+                );
+                gradient.addColorStop(0, "#03aff2");
+                gradient.addColorStop(1, "#0b86d7");
+
+                var x              = this.canvas.width / 2,
+                    y              = this.canvas.height / 2,
+                    radius         = 75,
+                    startAngle     = 0,
+                    endAngle       = (360 * this.timeLeft.percent) / 100,
+                    anticlockwise  = false;
+
                 this.ctx.beginPath();
 
-                var x              = 60,               // x coordinate
-                    y              = 60,               // y coordinate
-                    radius         = 50,                    // Arc radius
-                    startAngle     = -90,                     // Starting point on circle
-                    endAngle       = -180,                // End point on circle
-                    anticlockwise  = true;                   // clockwise or anticlockwise
+                this.ctx.strokeStyle = gradient;
+                this.ctx.lineWidth = 15;
 
-                this.ctx.strokeStyle = "#df4b26";
-                this.ctx.lineWidth = 4;
+                this.ctx.shadowColor = null;
+                this.ctx.shadowBlur = 0;
+                this.ctx.shadowOffsetX = 0;
+                this.ctx.shadowOffsetY = 0;
 
-                this.ctx.arc(x, y, radius, (Math.PI/180) * startAngle, (Math.PI/180) * endAngle, anticlockwise);
+                this.ctx.arc(x, y, radius, (Math.PI/180) * (startAngle - 90), (Math.PI/180) * (endAngle - 90), anticlockwise);
                 this.ctx.stroke();
+            },
+
+            _renderRingBg: function() {
+                var x              = this.canvas.width / 2,
+                    y              = this.canvas.height / 2,
+                    radius         = 75,
+                    startAngle     = 0,
+                    endAngle       = 2 * Math.PI,
+                    anticlockwise  = false;
+
+                this.ctx.beginPath();
+
+                this.ctx.strokeStyle = "#f6f6f6";
+                this.ctx.lineWidth = 15;
+
+                this.ctx.shadowColor = null;
+                this.ctx.shadowBlur = 0;
+                this.ctx.shadowOffsetX = 0;
+                this.ctx.shadowOffsetY = 0;
+
+                this.ctx.arc(x, y, radius, startAngle, endAngle, anticlockwise);
+                this.ctx.stroke();
+            },
+
+            _renderRingOuter: function() {
+                var x              = this.canvas.width / 2,
+                    y              = this.canvas.height / 2,
+                    radius         = 83,
+                    startAngle     = 0,
+                    endAngle       = 2 * Math.PI,
+                    anticlockwise  = false;
+
+                this.ctx.beginPath();
+                this.ctx.strokeStyle = "white";
+                this.ctx.lineWidth = 2;
+
+                this.ctx.shadowColor = "#969696";
+                this.ctx.shadowBlur = 6;
+                this.ctx.shadowOffsetX = 0.5;
+                this.ctx.shadowOffsetY = 0.5;
+
+                this.ctx.arc(x, y, radius, startAngle, endAngle, anticlockwise);
+                this.ctx.stroke();
+            },
+
+            _renderRingInner: function() {
+                var x              = this.canvas.width / 2,
+                    y              = this.canvas.height / 2,
+                    radius         = 67,
+                    startAngle     = 0,
+                    endAngle       = 2 * Math.PI,
+                    anticlockwise  = false;
+
+                this.ctx.beginPath();
+                this.ctx.strokeStyle = "white";
+                this.ctx.lineWidth = 2;
+
+                this.ctx.shadowColor = "#969696";
+                this.ctx.shadowBlur = 7;
+                this.ctx.shadowOffsetX = 0.5;
+                this.ctx.shadowOffsetY = 0.5;
+
+                this.ctx.arc(x, y, radius, startAngle, endAngle, anticlockwise);
+                this.ctx.stroke();
+            },
+
+            _renderText: function() {
+
+                var x = this.canvas.width / 2,
+                    y = (this.canvas.height / 2) - 20;
+
+                this.ctx.font = "18px Helvetica";
+                this.ctx.textAlign = "end";
+                this.ctx.fillStyle = "#75787a";
+
+                this.ctx.shadowColor = null;
+                this.ctx.shadowBlur = 0;
+                this.ctx.shadowOffsetX = 0;
+                this.ctx.shadowOffsetY = 0;
+
+                this.ctx.fillText(this.timeLeft.hours, x - 3, y);
+                this.ctx.fillText(this.timeLeft.minutes, x - 3, y + 26);
+                this.ctx.fillText(this.timeLeft.seconds, x - 3, y + 52);
+
+                this.ctx.fillStyle = "#00a9df";
+                this.ctx.textAlign = "start";
+
+                this.ctx.fillText("h", x + 3, y);
+                this.ctx.fillText("min", x + 3, y + 26);
+                this.ctx.fillText("s", x + 3, y + 52);
             }
         };
 
